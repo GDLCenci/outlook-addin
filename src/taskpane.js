@@ -136,6 +136,21 @@ function saveTaskDataOnEmail(formData, callback) {
   }
 }
 
+// ── Trigger Sync Agent ──────────────────────────────────────────
+var POKE_URL = 'https://claude.ai/api/v1/code/triggers/trig_01QKVDHPePpEvz7EA3AD57hi/poke?token=4n2Ex94JVRenNyLj660q-WkGvguMx8XlGgGkqT_EUdU';
+
+function triggerSync() {
+  // Fire and forget — don't block on response
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', POKE_URL);
+    xhr.timeout = 10000;
+    xhr.send();
+  } catch (e) {
+    // Ignore errors — sync will run on schedule anyway
+  }
+}
+
 // ── Tabs ────────────────────────────────────────────────────────
 function initTabs() {
   document.querySelectorAll('.tab').forEach(function (tab) {
@@ -189,12 +204,12 @@ function submitTask() {
     // Step 2: Save form data as custom properties on the email
     saveTaskDataOnEmail(formData, function (propErr) {
       if (propErr) {
-        // Categories worked, properties failed — still ok, sync agent will infer
-        showStatus(msg, 'success', 'Categoria "Task" aggiunta. Il sync agent creera il task.');
+        showStatus(msg, 'success', 'Categoria "Task" aggiunta. Sync in avvio...');
       } else {
-        showStatus(msg, 'success', 'Task creato! Il sync agent lo processera al prossimo ciclo.');
+        showStatus(msg, 'success', 'Task salvato. Sync in avvio...');
       }
       updateBadge('processing');
+      triggerSync();
       btn.disabled = false;
       btn.textContent = 'Crea Task';
       document.getElementById('notes').value = '';
@@ -237,8 +252,9 @@ function submitFollowup(days) {
     };
 
     saveTaskDataOnEmail(formData, function () {
-      showStatus(msg, 'success', 'Follow-up creato per ' + dueDateStr);
+      showStatus(msg, 'success', 'Follow-up creato per ' + dueDateStr + '. Sync in avvio...');
       updateBadge('processing');
+      triggerSync();
     });
   });
 }
