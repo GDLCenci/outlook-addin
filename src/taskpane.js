@@ -217,56 +217,37 @@ function tryCategories(formData, callback) {
     cats.push({displayName: formData.area, color: Office.MailboxEnums.CategoryColor.None});
   }
 
-  var done = false;
-  setTimeout(function() { if (!done) { done = true; callback(false); } }, 5000);
-
-  try {
-    item.categories.addAsync(cats, function(result) {
-      if (!done) {
-        done = true;
-        callback(result.status === Office.AsyncResultStatus.Succeeded);
-      }
-    });
-  } catch(e) {
-    if (!done) { done = true; callback(false); }
-  }
+  item.categories.addAsync(cats, function(result) {
+    callback(result.status === Office.AsyncResultStatus.Succeeded);
+  });
 }
 
 function tryCustomProperties(formData, callback) {
   var item = Office.context.mailbox.item;
-  var done = false;
-  setTimeout(function() { if (!done) { done = true; callback(false); } }, 5000);
 
-  try {
-    item.loadCustomPropertiesAsync(function(result) {
-      if (result.status !== Office.AsyncResultStatus.Succeeded) {
-        if (!done) { done = true; callback(false); }
-        return;
-      }
-      var props = result.value;
-      props.set('taskTitle', formData.title || emailContext.subject);
-      props.set('taskArea', formData.area || '');
-      props.set('taskPriority', formData.priority || '');
-      props.set('taskDueDate', formData.dueDate || '');
-      props.set('taskStatus', formData.status || 'Not started');
-      props.set('taskAssignee', formData.assignee || 'Giuseppe');
-      props.set('taskNotes', formData.notes || '');
-      props.set('taskConversationId', emailContext.conversationId);
-      props.set('taskFrom', emailContext.from);
-      props.set('taskFromEmail', emailContext.fromEmail);
-      props.set('taskCreatedAt', new Date().toISOString());
-      props.set('taskPending', 'true');
+  item.loadCustomPropertiesAsync(function(result) {
+    if (result.status !== Office.AsyncResultStatus.Succeeded) {
+      callback(false);
+      return;
+    }
+    var props = result.value;
+    props.set('taskTitle', formData.title || emailContext.subject);
+    props.set('taskArea', formData.area || '');
+    props.set('taskPriority', formData.priority || '');
+    props.set('taskDueDate', formData.dueDate || '');
+    props.set('taskStatus', formData.status || 'Not started');
+    props.set('taskAssignee', formData.assignee || 'Giuseppe');
+    props.set('taskNotes', formData.notes || '');
+    props.set('taskConversationId', emailContext.conversationId);
+    props.set('taskFrom', emailContext.from);
+    props.set('taskFromEmail', emailContext.fromEmail);
+    props.set('taskCreatedAt', new Date().toISOString());
+    props.set('taskPending', 'true');
 
-      props.saveAsync(function(sr) {
-        if (!done) {
-          done = true;
-          callback(sr.status === Office.AsyncResultStatus.Succeeded);
-        }
-      });
+    props.saveAsync(function(sr) {
+      callback(sr.status === Office.AsyncResultStatus.Succeeded);
     });
-  } catch(e) {
-    if (!done) { done = true; callback(false); }
-  }
+  });
 }
 
 // ── Follow-up ───────────────────────────────────────────────────
