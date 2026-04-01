@@ -185,23 +185,18 @@ function submitTask() {
     notes: document.getElementById('notes').value.trim()
   };
 
-  // Try methods in order of preference
-  tryCategories(formData, function(catOk) {
-    tryCustomProperties(formData, function(propOk) {
-      var methods = [];
-      if (catOk) methods.push('categoria');
-      if (propOk) methods.push('proprietà');
+  // Save via customProperties only (categories.addAsync is unreliable)
+  tryCustomProperties(formData, function(propOk) {
+    if (propOk) {
+      showStatus(msg, 'success', 'Task salvato! Il sync agent lo processerà al prossimo ciclo.');
+      updateBadge('processing');
+    } else {
+      showStatus(msg, 'error', 'Errore nel salvataggio. Riprova.');
+    }
 
-      if (methods.length > 0) {
-        showStatus(msg, 'success', 'Salvato via: ' + methods.join(' + ') + '. Sync processerà al prossimo ciclo.');
-      } else {
-        showStatus(msg, 'error', 'Nessun metodo ha funzionato. Verifica il pannello diagnostica.');
-      }
-
-      btn.disabled = false;
-      btn.textContent = 'Crea Task';
-      document.getElementById('notes').value = '';
-    });
+    btn.disabled = false;
+    btn.textContent = 'Crea Task';
+    document.getElementById('notes').value = '';
   });
 }
 
@@ -277,14 +272,12 @@ function submitFollowup(days) {
     notes: 'Follow-up su email da ' + emailContext.from
   };
 
-  tryCategories(formData, function(catOk) {
-    tryCustomProperties(formData, function(propOk) {
-      if (catOk || propOk) {
-        showStatus(msg, 'success', 'Follow-up creato per ' + dueDateStr);
-      } else {
-        showStatus(msg, 'error', 'Errore nel salvare il follow-up.');
-      }
-    });
+  tryCustomProperties(formData, function(propOk) {
+    if (propOk) {
+      showStatus(msg, 'success', 'Follow-up creato per ' + dueDateStr);
+    } else {
+      showStatus(msg, 'error', 'Errore nel salvare il follow-up.');
+    }
   });
 }
 
