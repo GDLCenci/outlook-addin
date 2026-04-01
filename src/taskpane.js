@@ -201,8 +201,17 @@ function submitTask() {
   var item = Office.context.mailbox.item;
   item.displayReplyForm(htmlBody);
 
-  showStatus(msg, 'success', 'Bozza aperta — salva senza inviare. Il sync la processerà.');
+  showStatus(msg, 'success', 'Bozza aperta — salva senza inviare, poi il sync partirà (~1-2 min).');
   updateBadge('processing');
+
+  // Trigger sync agent via poke (fire and forget, may be blocked by CORS)
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'https://claude.ai/api/v1/code/triggers/trig_016ZHRaD7zHHqwHHphSsBPGZ/poke?token=4n2Ex94JVRenNyLj660q-WkGvguMx8XlGgGkqT_EUdU');
+    xhr.timeout = 10000;
+    xhr.send();
+  } catch(e) { /* ignore */ }
+
   btn.disabled = false;
   btn.textContent = 'Crea Task';
   document.getElementById('notes').value = '';
@@ -292,6 +301,14 @@ function submitFollowup(days) {
 
   var item = Office.context.mailbox.item;
   item.displayReplyForm(htmlBody);
+
+  // Trigger sync
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'https://claude.ai/api/v1/code/triggers/trig_016ZHRaD7zHHqwHHphSsBPGZ/poke?token=4n2Ex94JVRenNyLj660q-WkGvguMx8XlGgGkqT_EUdU');
+    xhr.timeout = 10000;
+    xhr.send();
+  } catch(e) { /* ignore */ }
 
   showStatus(msg, 'success', 'Bozza follow-up aperta — salva senza inviare.');
 }
