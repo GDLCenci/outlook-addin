@@ -12,13 +12,14 @@ var emailContext = {
 
 // ── Office.js Init ──────────────────────────────────────────────
 Office.onReady(function (info) {
-  if (info.host === Office.HostType.Outlook) {
-    loadEmailContext();
-    initTabs();
-    initForm();
-    initFollowup();
-    runDiagnostics();
-  }
+  var log = document.getElementById('diagnosticLog');
+  if (log) log.textContent = 'Office.onReady fired. Host: ' + (info.host || 'null') + ', Platform: ' + (info.platform || 'null');
+
+  loadEmailContext();
+  initTabs();
+  initForm();
+  initFollowup();
+  runDiagnostics();
 });
 
 function loadEmailContext() {
