@@ -46,19 +46,28 @@ function loadEmailContext() {
 }
 
 function getToken() {
-  Office.context.mailbox.getCallbackTokenAsync({ isRest: true }, function (result) {
-    if (result.status === Office.AsyncResultStatus.Succeeded) {
-      accessToken = result.value;
-      // Convert item ID to REST format
-      if (Office.context.mailbox.convertToRestId) {
-        emailContext.restItemId = Office.context.mailbox.convertToRestId(
-          emailContext.itemId, Office.MailboxEnums.RestSource.Id
-        );
+  try {
+    Office.context.mailbox.getCallbackTokenAsync({ isRest: true }, function (result) {
+      var statusEl = document.getElementById('statusMsg');
+      if (result.status === Office.AsyncResultStatus.Succeeded) {
+        accessToken = result.value;
+        if (Office.context.mailbox.convertToRestId) {
+          emailContext.restItemId = Office.context.mailbox.convertToRestId(
+            emailContext.itemId, Office.MailboxEnums.RestSource.Id
+          );
+        } else {
+          emailContext.restItemId = emailContext.itemId;
+        }
+        showStatus(statusEl, 'success', 'Connesso');
+        setTimeout(function () { statusEl.className = 'status-msg'; }, 2000);
       } else {
-        emailContext.restItemId = emailContext.itemId;
+        showStatus(statusEl, 'error', 'Token error: ' + (result.error ? result.error.message : 'unknown'));
       }
-    }
-  });
+    });
+  } catch (e) {
+    var statusEl = document.getElementById('statusMsg');
+    showStatus(statusEl, 'error', 'Token exception: ' + e.message);
+  }
 }
 
 // ── Graph API calls ─────────────────────────────────────────────
