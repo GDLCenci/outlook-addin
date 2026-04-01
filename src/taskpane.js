@@ -17,6 +17,7 @@ Office.onReady(function (info) {
     initTabs();
     initForm();
     initFollowup();
+    runDiagnostics();
   }
 });
 
@@ -40,115 +41,73 @@ function loadEmailContext() {
       emailContext.body = result.value.substring(0, 2000);
     }
   });
-
-  // Check if "Task" category already exists
-  checkExistingCategories();
 }
 
-// ── Categories via Office.js (no REST token needed) ─────────────
-function checkExistingCategories() {
+// ── Diagnostics: test what works ────────────────────────────────
+function runDiagnostics() {
+  var log = document.getElementById('diagnosticLog');
+  if (!log) return;
+
   var item = Office.context.mailbox.item;
-  if (item.categories && item.categories.getAsync) {
-    item.categories.getAsync(function (result) {
-      if (result.status === Office.AsyncResultStatus.Succeeded && result.value) {
-        var cats = result.value.map(function (c) { return c.displayName; });
-        if (cats.indexOf('Task') !== -1) {
-          updateBadge('processing');
+  var results = [];
+
+  // Test 1: Basic item read
+  results.push('Subject: ' + (item.subject ? 'OK' : 'FAIL'));
+  results.push('ItemId: ' + (item.itemId ? 'OK' : 'FAIL'));
+
+  // Test 2: categories.addAsync
+  if (item.categories && item.categories.addAsync) {
+    results.push('categories.addAsync: EXISTS');
+    item.categories.addAsync([{displayName: 'TestDiag', color: Office.MailboxEnums.CategoryColor.None}], function(r) {
+      if (r.status === Office.AsyncResultStatus.Succeeded) {
+        results.push('categories.addAsync: OK');
+        // Clean up
+        if (item.categories.removeAsync) {
+          item.categories.removeAsync(['TestDiag'], function() {});
         }
-      }
-    });
-  }
-}
-
-function addCategories(categories, callback) {
-  var item = Office.context.mailbox.item;
-  var callbackFired = false;
-
-  function done(err) {
-    if (callbackFired) return;
-    callbackFired = true;
-    callback(err);
-  }
-
-  // Timeout: if categories API hangs, proceed without them
-  setTimeout(function () { done(null); }, 5000);
-
-  if (!item.categories || !item.categories.addAsync) {
-    done(null); // skip categories, proceed with custom properties
-    return;
-  }
-
-  try {
-    var catObjects = categories.map(function (name) {
-      return { displayName: name, color: Office.MailboxEnums.CategoryColor.None };
-    });
-
-    item.categories.addAsync(catObjects, function (result) {
-      if (result.status === Office.AsyncResultStatus.Succeeded) {
-        done(null);
       } else {
-        done(null); // categories failed but we proceed anyway
+        results.push('categories.addAsync: FAIL - ' + (r.error ? r.error.message : 'unknown'));
       }
+      log.textContent = results.join('\n');
     });
-  } catch (e) {
-    done(null); // proceed without categories
-  }
-}
-
-// ── Custom Properties (save task data on the email itself) ──────
-function saveTaskDataOnEmail(formData, callback) {
-  var item = Office.context.mailbox.item;
-  var callbackFired = false;
-
-  function done(err) {
-    if (callbackFired) return;
-    callbackFired = true;
-    callback(err);
+  } else {
+    results.push('categories.addAsync: NOT AVAILABLE');
   }
 
-  setTimeout(function () { done(null); }, 5000);
-
-  try {
-    item.loadCustomPropertiesAsync(function (result) {
-      if (result.status !== Office.AsyncResultStatus.Succeeded) {
-        done(null);
-        return;
-      }
-      var props = result.value;
-      props.set('taskTitle', formData.title || emailContext.subject);
-      props.set('taskArea', formData.area || '');
-      props.set('taskPriority', formData.priority || '');
-      props.set('taskDueDate', formData.dueDate || '');
-      props.set('taskStatus', formData.status || 'Not started');
-      props.set('taskAssignee', formData.assignee || 'Giuseppe');
-      props.set('taskNotes', formData.notes || '');
-      props.set('taskConversationId', emailContext.conversationId);
-      props.set('taskFrom', emailContext.from);
-      props.set('taskFromEmail', emailContext.fromEmail);
-      props.set('taskCreatedAt', new Date().toISOString());
-
-      props.saveAsync(function (saveResult) {
-        done(null);
+  // Test 3: customProperties
+  item.loadCustomPropertiesAsync(function(r) {
+    if (r.status === Office.AsyncResultStatus.Succeeded) {
+      var props = r.value;
+      props.set('diagTest', 'hello');
+      props.saveAsync(function(sr) {
+        if (sr.status === Office.AsyncResultStatus.Succeeded) {
+          results.push('customProperties: OK (save works)');
+        } else {
+          results.push('customProperties: SAVE FAIL - ' + (sr.error ? sr.error.message : 'unknown'));
+        }
+        log.textContent = results.join('\n');
       });
-    });
-  } catch (e) {
-    done(null);
-  }
-}
+    } else {
+      results.push('customProperties: LOAD FAIL - ' + (r.error ? r.error.message : 'unknown'));
+      log.textContent = results.join('\n');
+    }
+  });
 
-// ── Trigger Sync Agent ──────────────────────────────────────────
-var POKE_URL = 'https://claude.ai/api/v1/code/triggers/trig_01QKVDHPePpEvz7EA3AD57hi/poke?token=4n2Ex94JVRenNyLj660q-WkGvguMx8XlGgGkqT_EUdU';
+  // Test 4: getCallbackTokenAsync
+  Office.context.mailbox.getCallbackTokenAsync({isRest: true}, function(r) {
+    if (r.status === Office.AsyncResultStatus.Succeeded) {
+      results.push('REST token: OK');
+    } else {
+      results.push('REST token: FAIL - ' + (r.error ? r.error.message : 'unknown'));
+    }
+    log.textContent = results.join('\n');
+  });
 
-function triggerSync() {
-  // Fire and forget — don't block on response
-  try {
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', POKE_URL);
-    xhr.timeout = 10000;
-    xhr.send();
-  } catch (e) {
-    // Ignore errors — sync will run on schedule anyway
-  }
+  // Test 5: displayReplyFormAsync (just check if exists)
+  results.push('displayReplyForm: ' + (item.displayReplyForm ? 'EXISTS' : 'NOT AVAILABLE'));
+  results.push('displayReplyAllFormAsync: ' + (item.displayReplyAllFormAsync ? 'EXISTS' : 'NOT AVAILABLE'));
+
+  log.textContent = results.join('\n');
 }
 
 // ── Tabs ────────────────────────────────────────────────────────
@@ -163,7 +122,7 @@ function initTabs() {
   });
 }
 
-// ── Form Submit ─────────────────────────────────────────────────
+// ── Submit: try all methods ─────────────────────────────────────
 function initForm() {
   document.getElementById('task-form').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -177,7 +136,7 @@ function submitTask() {
 
   btn.disabled = true;
   btn.textContent = 'Invio in corso...';
-  showStatus(msg, 'loading', 'Creazione task...');
+  showStatus(msg, 'loading', 'Tentativo salvataggio...');
 
   var formData = {
     title: document.getElementById('title').value.trim(),
@@ -189,32 +148,88 @@ function submitTask() {
     notes: document.getElementById('notes').value.trim()
   };
 
-  // Step 1: Add "Task" category (+ area if selected)
-  var categories = ['Task'];
-  if (formData.area) categories.push(formData.area);
+  // Try methods in order of preference
+  tryCategories(formData, function(catOk) {
+    tryCustomProperties(formData, function(propOk) {
+      var methods = [];
+      if (catOk) methods.push('categoria');
+      if (propOk) methods.push('proprietà');
 
-  addCategories(categories, function (catErr) {
-    if (catErr) {
-      showStatus(msg, 'error', catErr.message);
-      btn.disabled = false;
-      btn.textContent = 'Crea Task';
-      return;
-    }
-
-    // Step 2: Save form data as custom properties on the email
-    saveTaskDataOnEmail(formData, function (propErr) {
-      if (propErr) {
-        showStatus(msg, 'success', 'Categoria "Task" aggiunta. Sync in avvio...');
+      if (methods.length > 0) {
+        showStatus(msg, 'success', 'Salvato via: ' + methods.join(' + ') + '. Sync processerà al prossimo ciclo.');
       } else {
-        showStatus(msg, 'success', 'Task salvato. Sync in avvio...');
+        showStatus(msg, 'error', 'Nessun metodo ha funzionato. Verifica il pannello diagnostica.');
       }
-      updateBadge('processing');
-      triggerSync();
+
       btn.disabled = false;
       btn.textContent = 'Crea Task';
       document.getElementById('notes').value = '';
     });
   });
+}
+
+function tryCategories(formData, callback) {
+  var item = Office.context.mailbox.item;
+  if (!item.categories || !item.categories.addAsync) {
+    callback(false);
+    return;
+  }
+
+  var cats = [{displayName: 'Task', color: Office.MailboxEnums.CategoryColor.None}];
+  if (formData.area) {
+    cats.push({displayName: formData.area, color: Office.MailboxEnums.CategoryColor.None});
+  }
+
+  var done = false;
+  setTimeout(function() { if (!done) { done = true; callback(false); } }, 5000);
+
+  try {
+    item.categories.addAsync(cats, function(result) {
+      if (!done) {
+        done = true;
+        callback(result.status === Office.AsyncResultStatus.Succeeded);
+      }
+    });
+  } catch(e) {
+    if (!done) { done = true; callback(false); }
+  }
+}
+
+function tryCustomProperties(formData, callback) {
+  var item = Office.context.mailbox.item;
+  var done = false;
+  setTimeout(function() { if (!done) { done = true; callback(false); } }, 5000);
+
+  try {
+    item.loadCustomPropertiesAsync(function(result) {
+      if (result.status !== Office.AsyncResultStatus.Succeeded) {
+        if (!done) { done = true; callback(false); }
+        return;
+      }
+      var props = result.value;
+      props.set('taskTitle', formData.title || emailContext.subject);
+      props.set('taskArea', formData.area || '');
+      props.set('taskPriority', formData.priority || '');
+      props.set('taskDueDate', formData.dueDate || '');
+      props.set('taskStatus', formData.status || 'Not started');
+      props.set('taskAssignee', formData.assignee || 'Giuseppe');
+      props.set('taskNotes', formData.notes || '');
+      props.set('taskConversationId', emailContext.conversationId);
+      props.set('taskFrom', emailContext.from);
+      props.set('taskFromEmail', emailContext.fromEmail);
+      props.set('taskCreatedAt', new Date().toISOString());
+      props.set('taskPending', 'true');
+
+      props.saveAsync(function(sr) {
+        if (!done) {
+          done = true;
+          callback(sr.status === Office.AsyncResultStatus.Succeeded);
+        }
+      });
+    });
+  } catch(e) {
+    if (!done) { done = true; callback(false); }
+  }
 }
 
 // ── Follow-up ───────────────────────────────────────────────────
@@ -234,27 +249,23 @@ function submitFollowup(days) {
   dueDate.setDate(dueDate.getDate() + days);
   var dueDateStr = dueDate.toISOString().split('T')[0];
 
-  var categories = ['Task'];
-  addCategories(categories, function (catErr) {
-    if (catErr) {
-      showStatus(msg, 'error', catErr.message);
-      return;
-    }
+  var formData = {
+    title: 'Follow-up: ' + emailContext.subject,
+    area: '',
+    priority: 'Medium',
+    dueDate: dueDateStr,
+    status: 'Not started',
+    assignee: 'Giuseppe',
+    notes: 'Follow-up su email da ' + emailContext.from
+  };
 
-    var formData = {
-      title: 'Follow-up: ' + emailContext.subject,
-      area: '',
-      priority: 'Medium',
-      dueDate: dueDateStr,
-      status: 'Not started',
-      assignee: 'Giuseppe',
-      notes: 'Follow-up su email da ' + emailContext.from
-    };
-
-    saveTaskDataOnEmail(formData, function () {
-      showStatus(msg, 'success', 'Follow-up creato per ' + dueDateStr + '. Sync in avvio...');
-      updateBadge('processing');
-      triggerSync();
+  tryCategories(formData, function(catOk) {
+    tryCustomProperties(formData, function(propOk) {
+      if (catOk || propOk) {
+        showStatus(msg, 'success', 'Follow-up creato per ' + dueDateStr);
+      } else {
+        showStatus(msg, 'error', 'Errore nel salvare il follow-up.');
+      }
     });
   });
 }
