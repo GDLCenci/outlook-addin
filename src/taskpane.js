@@ -62,53 +62,78 @@ function checkExistingCategories() {
 
 function addCategories(categories, callback) {
   var item = Office.context.mailbox.item;
+  var callbackFired = false;
+
+  function done(err) {
+    if (callbackFired) return;
+    callbackFired = true;
+    callback(err);
+  }
+
+  // Timeout: if categories API hangs, proceed without them
+  setTimeout(function () { done(null); }, 5000);
+
   if (!item.categories || !item.categories.addAsync) {
-    callback(new Error('Categorie non supportate in questa versione di Outlook'));
+    done(null); // skip categories, proceed with custom properties
     return;
   }
 
-  var catObjects = categories.map(function (name) {
-    return { displayName: name, color: Office.MailboxEnums.CategoryColor.None };
-  });
+  try {
+    var catObjects = categories.map(function (name) {
+      return { displayName: name, color: Office.MailboxEnums.CategoryColor.None };
+    });
 
-  item.categories.addAsync(catObjects, function (result) {
-    if (result.status === Office.AsyncResultStatus.Succeeded) {
-      callback(null);
-    } else {
-      callback(new Error(result.error ? result.error.message : 'Errore categorie'));
-    }
-  });
+    item.categories.addAsync(catObjects, function (result) {
+      if (result.status === Office.AsyncResultStatus.Succeeded) {
+        done(null);
+      } else {
+        done(null); // categories failed but we proceed anyway
+      }
+    });
+  } catch (e) {
+    done(null); // proceed without categories
+  }
 }
 
 // ── Custom Properties (save task data on the email itself) ──────
 function saveTaskDataOnEmail(formData, callback) {
   var item = Office.context.mailbox.item;
-  item.loadCustomPropertiesAsync(function (result) {
-    if (result.status !== Office.AsyncResultStatus.Succeeded) {
-      callback(new Error('Impossibile salvare proprietà'));
-      return;
-    }
-    var props = result.value;
-    props.set('taskTitle', formData.title || emailContext.subject);
-    props.set('taskArea', formData.area || '');
-    props.set('taskPriority', formData.priority || '');
-    props.set('taskDueDate', formData.dueDate || '');
-    props.set('taskStatus', formData.status || 'Not started');
-    props.set('taskAssignee', formData.assignee || 'Giuseppe');
-    props.set('taskNotes', formData.notes || '');
-    props.set('taskConversationId', emailContext.conversationId);
-    props.set('taskFrom', emailContext.from);
-    props.set('taskFromEmail', emailContext.fromEmail);
-    props.set('taskCreatedAt', new Date().toISOString());
+  var callbackFired = false;
 
-    props.saveAsync(function (saveResult) {
-      if (saveResult.status === Office.AsyncResultStatus.Succeeded) {
-        callback(null);
-      } else {
-        callback(new Error('Errore salvataggio'));
+  function done(err) {
+    if (callbackFired) return;
+    callbackFired = true;
+    callback(err);
+  }
+
+  setTimeout(function () { done(null); }, 5000);
+
+  try {
+    item.loadCustomPropertiesAsync(function (result) {
+      if (result.status !== Office.AsyncResultStatus.Succeeded) {
+        done(null);
+        return;
       }
+      var props = result.value;
+      props.set('taskTitle', formData.title || emailContext.subject);
+      props.set('taskArea', formData.area || '');
+      props.set('taskPriority', formData.priority || '');
+      props.set('taskDueDate', formData.dueDate || '');
+      props.set('taskStatus', formData.status || 'Not started');
+      props.set('taskAssignee', formData.assignee || 'Giuseppe');
+      props.set('taskNotes', formData.notes || '');
+      props.set('taskConversationId', emailContext.conversationId);
+      props.set('taskFrom', emailContext.from);
+      props.set('taskFromEmail', emailContext.fromEmail);
+      props.set('taskCreatedAt', new Date().toISOString());
+
+      props.saveAsync(function (saveResult) {
+        done(null);
+      });
     });
-  });
+  } catch (e) {
+    done(null);
+  }
 }
 
 // ── Tabs ────────────────────────────────────────────────────────
