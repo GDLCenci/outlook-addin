@@ -49,12 +49,24 @@ function runDiagnostics() {
   var log = document.getElementById('diagnosticLog');
   if (!log) return;
 
-  var item = Office.context.mailbox.item;
   var results = [];
 
+  // Test 0: mailbox and item exist?
+  results.push('mailbox: ' + (Office.context.mailbox ? 'OK' : 'NULL'));
+  var item = Office.context.mailbox ? Office.context.mailbox.item : null;
+  results.push('item: ' + (item ? 'OK' : 'NULL'));
+
+  if (!item) {
+    results.push('STOP: no item available');
+    log.textContent = results.join('\n');
+    return;
+  }
+
   // Test 1: Basic item read
-  results.push('Subject: ' + (item.subject ? 'OK' : 'FAIL'));
-  results.push('ItemId: ' + (item.itemId ? 'OK' : 'FAIL'));
+  results.push('Subject: ' + (item.subject || '(empty)'));
+  results.push('ItemId: ' + (item.itemId ? 'OK (' + item.itemId.substring(0, 20) + '...)' : 'FAIL'));
+  results.push('ConversationId: ' + (item.conversationId ? 'OK' : 'FAIL'));
+  log.textContent = results.join('\n');
 
   // Test 2: categories.addAsync
   if (item.categories && item.categories.addAsync) {
