@@ -197,20 +197,28 @@ function submitTask() {
 
   var htmlBody = '<pre>' + lines.join('\n') + '</pre>';
 
-  // Open reply form with pre-filled content — user saves as draft
-  var item = Office.context.mailbox.item;
-  item.displayReplyForm(htmlBody);
+  // Create new message to self with // TASK content
+  Office.context.mailbox.displayNewMessageFormAsync(
+    {
+      toRecipients: ['giuseppe.dilollo@cencofinance.com'],
+      subject: '// TASK — ' + (formData.title || emailContext.subject),
+      htmlBody: htmlBody + '<hr><p><small>Email originale: ' + emailContext.subject + ' — Da: ' + emailContext.from + ' &lt;' + emailContext.fromEmail + '&gt;</small></p>'
+    },
+    function(result) {
+      showStatus(msg, 'success', 'Bozza task aperta — chiudi con X per salvare in Bozze.');
+      updateBadge('processing');
 
-  showStatus(msg, 'success', 'Bozza aperta — salva senza inviare, poi il sync partirà (~1-2 min).');
-  updateBadge('processing');
-
-  // Trigger sync agent via poke (fire and forget, may be blocked by CORS)
-  try {
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', 'https://claude.ai/api/v1/code/triggers/trig_016ZHRaD7zHHqwHHphSsBPGZ/poke?token=4n2Ex94JVRenNyLj660q-WkGvguMx8XlGgGkqT_EUdU');
-    xhr.timeout = 10000;
-    xhr.send();
-  } catch(e) { /* ignore */ }
+      // Trigger sync after a delay (user needs time to close the form)
+      setTimeout(function() {
+        try {
+          var xhr = new XMLHttpRequest();
+          xhr.open('POST', 'https://claude.ai/api/v1/code/triggers/trig_016ZHRaD7zHHqwHHphSsBPGZ/poke?token=4n2Ex94JVRenNyLj660q-WkGvguMx8XlGgGkqT_EUdU');
+          xhr.timeout = 10000;
+          xhr.send();
+        } catch(e) { /* ignore */ }
+      }, 30000); // 30 seconds delay
+    }
+  );
 
   btn.disabled = false;
   btn.textContent = 'Crea Task';
@@ -299,18 +307,24 @@ function submitFollowup(days) {
 
   var htmlBody = '<pre>' + lines.join('\n') + '</pre>';
 
-  var item = Office.context.mailbox.item;
-  item.displayReplyForm(htmlBody);
-
-  // Trigger sync
-  try {
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', 'https://claude.ai/api/v1/code/triggers/trig_016ZHRaD7zHHqwHHphSsBPGZ/poke?token=4n2Ex94JVRenNyLj660q-WkGvguMx8XlGgGkqT_EUdU');
-    xhr.timeout = 10000;
-    xhr.send();
-  } catch(e) { /* ignore */ }
-
-  showStatus(msg, 'success', 'Bozza follow-up aperta — salva senza inviare.');
+  Office.context.mailbox.displayNewMessageFormAsync(
+    {
+      toRecipients: ['giuseppe.dilollo@cencofinance.com'],
+      subject: '// TASK — ' + formData.title,
+      htmlBody: htmlBody + '<hr><p><small>Email originale: ' + emailContext.subject + ' — Da: ' + emailContext.from + '</small></p>'
+    },
+    function(result) {
+      showStatus(msg, 'success', 'Bozza follow-up aperta — chiudi con X per salvare.');
+      setTimeout(function() {
+        try {
+          var xhr = new XMLHttpRequest();
+          xhr.open('POST', 'https://claude.ai/api/v1/code/triggers/trig_016ZHRaD7zHHqwHHphSsBPGZ/poke?token=4n2Ex94JVRenNyLj660q-WkGvguMx8XlGgGkqT_EUdU');
+          xhr.timeout = 10000;
+          xhr.send();
+        } catch(e) { /* ignore */ }
+      }, 30000);
+    }
+  );
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
