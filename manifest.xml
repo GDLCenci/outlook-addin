@@ -35,7 +35,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://gdlcenci.github.io/outlook-addin/src/taskpane.html"/>
+        <SourceLocation DefaultValue="https://gdlcenci.github.io/outlook-addin/src/taskpane.html?v=2"/>
         <RequestedHeight>450</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -93,7 +93,7 @@
         <bt:Image id="icon80" DefaultValue="https://gdlcenci.github.io/outlook-addin/src/assets/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="taskPaneUrl" DefaultValue="https://gdlcenci.github.io/outlook-addin/src/taskpane.html"/>
+        <bt:Url id="taskPaneUrl" DefaultValue="https://gdlcenci.github.io/outlook-addin/src/taskpane.html?v=2"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="groupLabel" DefaultValue="Task Manager"/>
@@ -148,7 +148,7 @@
           <bt:Image id="icon80" DefaultValue="https://gdlcenci.github.io/outlook-addin/src/assets/icon-80.png"/>
         </bt:Images>
         <bt:Urls>
-          <bt:Url id="taskPaneUrl" DefaultValue="https://gdlcenci.github.io/outlook-addin/src/taskpane.html"/>
+          <bt:Url id="taskPaneUrl" DefaultValue="https://gdlcenci.github.io/outlook-addin/src/taskpane.html?v=2"/>
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="groupLabel" DefaultValue="Task Manager"/>
