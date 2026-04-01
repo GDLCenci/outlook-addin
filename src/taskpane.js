@@ -7,11 +7,10 @@ var emailContext = {
   fromEmail: '',
   body: '',
   conversationId: '',
-  itemId: ''
+  itemId: '',
+  restItemId: ''
 };
-var restToken = null;
-var restUrl = '';
-var taskQueueFolderId = null;
+var accessToken = null;
 
 // ── Office.js Init ──────────────────────────────────────────────
 Office.onReady(function (info) {
@@ -20,7 +19,7 @@ Office.onReady(function (info) {
     initTabs();
     initForm();
     initFollowup();
-    acquireToken();
+    getToken();
   }
 });
 
@@ -46,53 +45,52 @@ function loadEmailContext() {
   });
 }
 
-function acquireToken() {
+function getToken() {
   Office.context.mailbox.getCallbackTokenAsync({ isRest: true }, function (result) {
     if (result.status === Office.AsyncResultStatus.Succeeded) {
-      restToken = result.value;
-      restUrl = Office.context.mailbox.restUrl;
-      ensureTaskQueueFolder();
+      accessToken = result.value;
+      // Convert item ID to REST format
+      if (Office.context.mailbox.convertToRestId) {
+        emailContext.restItemId = Office.context.mailbox.convertToRestId(
+          emailContext.itemId, Office.MailboxEnums.RestSource.Id
+        );
+      } else {
+        emailContext.restItemId = emailContext.itemId;
+      }
     }
   });
 }
 
-// ── Task Queue Folder ───────────────────────────────────────────
-function apiCall(method, path, body, callback) {
+// ── Graph API calls ─────────────────────────────────────────────
+function graphCall(method, path, body, callback) {
+  // Use restUrl from Office.js (points to correct Exchange endpoint)
+  var baseUrl = Office.context.mailbox.restUrl || 'https://outlook.office.com/api';
+  var url = baseUrl + '/v2.0/me' + path;
+
   var xhr = new XMLHttpRequest();
-  xhr.open(method, restUrl + '/v2.0/me' + path);
-  xhr.setRequestHeader('Authorization', 'Bearer ' + restToken);
+  xhr.open(method, url);
+  xhr.setRequestHeader('Authorization', 'Bearer ' + accessToken);
   xhr.setRequestHeader('Content-Type', 'application/json');
   xhr.onload = function () {
     if (xhr.status >= 200 && xhr.status < 300) {
       callback(null, xhr.responseText ? JSON.parse(xhr.responseText) : null);
     } else {
-      callback(new Error(xhr.status + ': ' + xhr.responseText));
+      callback(new Error('API ' + xhr.status));
     }
   };
   xhr.onerror = function () { callback(new Error('Errore di rete')); };
   xhr.send(body ? JSON.stringify(body) : null);
 }
 
-function ensureTaskQueueFolder() {
-  // Check if "Task Queue" folder exists under Inbox
-  apiCall('GET', '/mailfolders/inbox/childfolders?$filter=displayName eq \'Task Queue\'', null, function (err, data) {
-    if (err || !data || !data.value || data.value.length === 0) {
-      // Create it
-      apiCall('POST', '/mailfolders/inbox/childfolders', { DisplayName: 'Task Queue' }, function (err2, folder) {
-        if (!err2 && folder) {
-          taskQueueFolderId = folder.Id;
-        }
-      });
-    } else {
-      taskQueueFolderId = data.value[0].Id;
-    }
-  });
-}
-
-// ── Categories ──────────────────────────────────────────────────
+// ── Categories on current email ─────────────────────────────────
 function addCategoriesToEmail(categories, callback) {
-  // Get current categories first
-  apiCall('GET', '/messages/' + emailContext.itemId + '?$select=categories', null, function (err, msg) {
+  if (!accessToken) {
+    callback(new Error('Token non disponibile. Riprova tra qualche secondo.'));
+    return;
+  }
+
+  var id = emailContext.restItemId || emailContext.itemId;
+  graphCall('GET', '/messages/' + id + '?$select=Categories', null, function (err, msg) {
     if (err) { callback(err); return; }
 
     var current = (msg && msg.Categories) || [];
@@ -101,43 +99,70 @@ function addCategoriesToEmail(categories, callback) {
       if (merged.indexOf(cat) === -1) merged.push(cat);
     });
 
-    apiCall('PATCH', '/messages/' + emailContext.itemId, { Categories: merged }, function (err2) {
+    graphCall('PATCH', '/messages/' + id, { Categories: merged }, function (err2) {
       callback(err2);
     });
   });
 }
 
-// ── Build Task Queue Message ────────────────────────────────────
-function buildTaskData(formData) {
-  var lines = ['// TASK (from Outlook Add-in)', ''];
+// ── Task Queue Folder ───────────────────────────────────────────
+var taskQueueFolderId = null;
 
-  if (formData.title) lines.push('Titolo: ' + formData.title);
-  if (formData.area) lines.push('Area: ' + formData.area);
-  if (formData.priority) lines.push('Priorita: ' + formData.priority);
-  if (formData.dueDate) lines.push('Scadenza: ' + formData.dueDate);
-  if (formData.status) lines.push('Status: ' + formData.status);
-  if (formData.assignee) lines.push('Assignee: ' + formData.assignee);
+function ensureTaskQueueFolder(callback) {
+  if (taskQueueFolderId) { callback(null); return; }
 
-  lines.push('');
-  lines.push('--- Contesto email ---');
-  lines.push('Da: ' + emailContext.from + ' <' + emailContext.fromEmail + '>');
-  lines.push('Oggetto: ' + emailContext.subject);
-  lines.push('Conversation ID: ' + emailContext.conversationId);
-  lines.push('Message ID: ' + emailContext.itemId);
+  graphCall('GET', "/mailfolders/inbox/childfolders?$filter=displayName eq 'Task Queue'", null, function (err, data) {
+    if (!err && data && data.value && data.value.length > 0) {
+      taskQueueFolderId = data.value[0].Id;
+      callback(null);
+    } else {
+      graphCall('POST', '/mailfolders/inbox/childfolders', { DisplayName: 'Task Queue' }, function (err2, folder) {
+        if (!err2 && folder) {
+          taskQueueFolderId = folder.Id;
+          callback(null);
+        } else {
+          callback(err2 || new Error('Impossibile creare Task Queue folder'));
+        }
+      });
+    }
+  });
+}
 
-  if (formData.notes) {
+function saveToTaskQueue(formData, callback) {
+  ensureTaskQueueFolder(function (err) {
+    if (err) { callback(err); return; }
+
+    var lines = ['// TASK (from Outlook Add-in)', ''];
+    if (formData.title) lines.push('Titolo: ' + formData.title);
+    if (formData.area) lines.push('Area: ' + formData.area);
+    if (formData.priority) lines.push('Priorita: ' + formData.priority);
+    if (formData.dueDate) lines.push('Scadenza: ' + formData.dueDate);
+    if (formData.status) lines.push('Status: ' + formData.status);
+    if (formData.assignee) lines.push('Assignee: ' + formData.assignee);
     lines.push('');
-    lines.push('--- Note/Istruzioni ---');
-    lines.push(formData.notes);
-  }
+    lines.push('--- Contesto email ---');
+    lines.push('Da: ' + emailContext.from + ' <' + emailContext.fromEmail + '>');
+    lines.push('Oggetto: ' + emailContext.subject);
+    lines.push('Conversation ID: ' + emailContext.conversationId);
+    if (formData.notes) {
+      lines.push('');
+      lines.push('--- Note/Istruzioni ---');
+      lines.push(formData.notes);
+    }
+    if (emailContext.body) {
+      lines.push('');
+      lines.push('--- Corpo email (estratto) ---');
+      lines.push(emailContext.body.substring(0, 1000));
+    }
 
-  if (emailContext.body) {
-    lines.push('');
-    lines.push('--- Corpo email (estratto) ---');
-    lines.push(emailContext.body.substring(0, 1000));
-  }
+    var msg = {
+      Subject: '// TASK — ' + (formData.title || emailContext.subject),
+      Body: { ContentType: 'Text', Content: lines.join('\n') },
+      Categories: ['Task']
+    };
 
-  return lines.join('\n');
+    graphCall('POST', '/mailfolders/' + taskQueueFolderId + '/messages', msg, callback);
+  });
 }
 
 // ── Tabs ────────────────────────────────────────────────────────
@@ -190,31 +215,22 @@ function submitTask() {
       return;
     }
 
-    // Step 2: If there are notes/overrides, create message in Task Queue
+    // Step 2: If there are extras, save to Task Queue
     var hasExtras = formData.notes || formData.priority || formData.dueDate ||
                     formData.assignee !== 'Giuseppe' || formData.status !== 'Not started';
 
-    if (hasExtras && taskQueueFolderId) {
-      var taskBody = buildTaskData(formData);
-      var queueMsg = {
-        Subject: '// TASK — ' + (formData.title || emailContext.subject),
-        Body: { ContentType: 'Text', Content: taskBody },
-        Categories: ['Task']
-      };
-
-      // Create in Task Queue folder
-      apiCall('POST', '/mailfolders/' + taskQueueFolderId + '/messages', queueMsg, function (qErr) {
+    if (hasExtras) {
+      saveToTaskQueue(formData, function (qErr) {
         if (qErr) {
           showStatus(msg, 'error', 'Errore Task Queue: ' + qErr.message);
         } else {
-          showStatus(msg, 'success', 'Task creato (categoria + dettagli in Task Queue)');
+          showStatus(msg, 'success', 'Task creato! Il sync agent lo processera al prossimo ciclo.');
           updateBadge('processing');
         }
         btn.disabled = false;
         btn.textContent = 'Crea Task';
       });
     } else {
-      // No extras — category alone is enough
       showStatus(msg, 'success', 'Categoria "Task" aggiunta. Il sync agent creera il task.');
       updateBadge('processing');
       btn.disabled = false;
@@ -242,39 +258,30 @@ function submitFollowup(days) {
   dueDate.setDate(dueDate.getDate() + days);
   var dueDateStr = dueDate.toISOString().split('T')[0];
 
-  // Add categories
-  addCategoriesToEmail(['Task', 'Follow-up'], function (catErr) {
+  var categories = ['Task', 'Follow-up'];
+  addCategoriesToEmail(categories, function (catErr) {
     if (catErr) {
       showStatus(msg, 'error', 'Errore: ' + catErr.message);
       return;
     }
 
-    if (taskQueueFolderId) {
-      var formData = {
-        title: 'Follow-up: ' + emailContext.subject,
-        area: '',
-        priority: 'Medium',
-        dueDate: dueDateStr,
-        status: 'Not started',
-        assignee: 'Giuseppe',
-        notes: 'Follow-up automatico su email da ' + emailContext.from
-      };
-      var taskBody = buildTaskData(formData);
-      var queueMsg = {
-        Subject: '// TASK — Follow-up: ' + emailContext.subject,
-        Body: { ContentType: 'Text', Content: taskBody },
-        Categories: ['Task', 'Follow-up']
-      };
-      apiCall('POST', '/mailfolders/' + taskQueueFolderId + '/messages', queueMsg, function (qErr) {
-        if (qErr) {
-          showStatus(msg, 'error', 'Errore: ' + qErr.message);
-        } else {
-          showStatus(msg, 'success', 'Follow-up creato per ' + dueDateStr);
-        }
-      });
-    } else {
-      showStatus(msg, 'success', 'Follow-up segnato (categoria). Scadenza: ' + dueDateStr);
-    }
+    var formData = {
+      title: 'Follow-up: ' + emailContext.subject,
+      area: '',
+      priority: 'Medium',
+      dueDate: dueDateStr,
+      status: 'Not started',
+      assignee: 'Giuseppe',
+      notes: 'Follow-up automatico su email da ' + emailContext.from
+    };
+
+    saveToTaskQueue(formData, function (qErr) {
+      if (qErr) {
+        showStatus(msg, 'error', 'Errore: ' + qErr.message);
+      } else {
+        showStatus(msg, 'success', 'Follow-up creato per ' + dueDateStr);
+      }
+    });
   });
 }
 
