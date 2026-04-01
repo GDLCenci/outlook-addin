@@ -68,59 +68,83 @@ function runDiagnostics() {
   results.push('ConversationId: ' + (item.conversationId ? 'OK' : 'FAIL'));
   log.textContent = results.join('\n');
 
-  // Test 2: categories.addAsync
-  if (item.categories && item.categories.addAsync) {
-    results.push('categories.addAsync: EXISTS');
-    item.categories.addAsync([{displayName: 'TestDiag', color: Office.MailboxEnums.CategoryColor.None}], function(r) {
-      if (r.status === Office.AsyncResultStatus.Succeeded) {
-        results.push('categories.addAsync: OK');
-        // Clean up
-        if (item.categories.removeAsync) {
-          item.categories.removeAsync(['TestDiag'], function() {});
-        }
-      } else {
-        results.push('categories.addAsync: FAIL - ' + (r.error ? r.error.message : 'unknown'));
-      }
+  // Check what methods exist
+  results.push('--- Methods available ---');
+  results.push('categories obj: ' + (item.categories ? 'YES' : 'NO'));
+  results.push('categories.addAsync: ' + (item.categories && item.categories.addAsync ? 'YES' : 'NO'));
+  results.push('categories.getAsync: ' + (item.categories && item.categories.getAsync ? 'YES' : 'NO'));
+  results.push('loadCustomPropertiesAsync: ' + (item.loadCustomPropertiesAsync ? 'YES' : 'NO'));
+  results.push('getCallbackTokenAsync: ' + (Office.context.mailbox.getCallbackTokenAsync ? 'YES' : 'NO'));
+  results.push('displayReplyForm: ' + (item.displayReplyForm ? 'YES' : 'NO'));
+  results.push('displayReplyAllForm: ' + (item.displayReplyAllForm ? 'YES' : 'NO'));
+  log.textContent = results.join('\n');
+
+  // Test async APIs with timeout tracking
+  results.push('');
+  results.push('--- Async tests (wait 10s) ---');
+  log.textContent = results.join('\n');
+
+  var pending = 3;
+  function checkDone() {
+    pending--;
+    if (pending <= 0) {
+      results.push('--- All tests complete ---');
       log.textContent = results.join('\n');
-    });
-  } else {
-    results.push('categories.addAsync: NOT AVAILABLE');
+    }
   }
 
-  // Test 3: customProperties
-  item.loadCustomPropertiesAsync(function(r) {
-    if (r.status === Office.AsyncResultStatus.Succeeded) {
-      var props = r.value;
-      props.set('diagTest', 'hello');
-      props.saveAsync(function(sr) {
-        if (sr.status === Office.AsyncResultStatus.Succeeded) {
-          results.push('customProperties: OK (save works)');
-        } else {
-          results.push('customProperties: SAVE FAIL - ' + (sr.error ? sr.error.message : 'unknown'));
-        }
+  // Test A: categories.getAsync (read only, safer)
+  if (item.categories && item.categories.getAsync) {
+    try {
+      item.categories.getAsync(function(r) {
+        results.push('categories.getAsync: ' + r.status + (r.value ? ' (' + r.value.length + ' cats)' : ''));
         log.textContent = results.join('\n');
+        checkDone();
       });
-    } else {
-      results.push('customProperties: LOAD FAIL - ' + (r.error ? r.error.message : 'unknown'));
+    } catch(e) {
+      results.push('categories.getAsync: EXCEPTION ' + e.message);
+      log.textContent = results.join('\n');
+      checkDone();
+    }
+  } else { results.push('categories.getAsync: SKIP'); checkDone(); }
+
+  // Test B: customProperties
+  if (item.loadCustomPropertiesAsync) {
+    try {
+      item.loadCustomPropertiesAsync(function(r) {
+        results.push('customProperties.load: ' + r.status);
+        log.textContent = results.join('\n');
+        checkDone();
+      });
+    } catch(e) {
+      results.push('customProperties: EXCEPTION ' + e.message);
+      log.textContent = results.join('\n');
+      checkDone();
+    }
+  } else { results.push('customProperties: SKIP'); checkDone(); }
+
+  // Test C: REST token
+  if (Office.context.mailbox.getCallbackTokenAsync) {
+    try {
+      Office.context.mailbox.getCallbackTokenAsync({isRest: true}, function(r) {
+        results.push('REST token: ' + r.status + (r.error ? ' - ' + r.error.message : ''));
+        log.textContent = results.join('\n');
+        checkDone();
+      });
+    } catch(e) {
+      results.push('REST token: EXCEPTION ' + e.message);
+      log.textContent = results.join('\n');
+      checkDone();
+    }
+  } else { results.push('REST token: SKIP'); checkDone(); }
+
+  // Timeout fallback
+  setTimeout(function() {
+    if (pending > 0) {
+      results.push('TIMEOUT: ' + pending + ' async tests did not respond in 10s');
       log.textContent = results.join('\n');
     }
-  });
-
-  // Test 4: getCallbackTokenAsync
-  Office.context.mailbox.getCallbackTokenAsync({isRest: true}, function(r) {
-    if (r.status === Office.AsyncResultStatus.Succeeded) {
-      results.push('REST token: OK');
-    } else {
-      results.push('REST token: FAIL - ' + (r.error ? r.error.message : 'unknown'));
-    }
-    log.textContent = results.join('\n');
-  });
-
-  // Test 5: displayReplyFormAsync (just check if exists)
-  results.push('displayReplyForm: ' + (item.displayReplyForm ? 'EXISTS' : 'NOT AVAILABLE'));
-  results.push('displayReplyAllFormAsync: ' + (item.displayReplyAllFormAsync ? 'EXISTS' : 'NOT AVAILABLE'));
-
-  log.textContent = results.join('\n');
+  }, 10000);
 }
 
 // ── Tabs ────────────────────────────────────────────────────────
