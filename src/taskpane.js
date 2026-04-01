@@ -185,19 +185,27 @@ function submitTask() {
     notes: document.getElementById('notes').value.trim()
   };
 
-  // Save via customProperties only (categories.addAsync is unreliable)
-  tryCustomProperties(formData, function(propOk) {
-    if (propOk) {
-      showStatus(msg, 'success', 'Task salvato! Il sync agent lo processerà al prossimo ciclo.');
-      updateBadge('processing');
-    } else {
-      showStatus(msg, 'error', 'Errore nel salvataggio. Riprova.');
-    }
+  // Build structured draft content
+  var lines = ['// TASK (from Outlook Add-in)', ''];
+  if (formData.title) lines.push('Titolo: ' + formData.title);
+  if (formData.area) lines.push('Area: ' + formData.area);
+  if (formData.priority) lines.push('Priorita: ' + formData.priority);
+  if (formData.dueDate) lines.push('Scadenza: ' + formData.dueDate);
+  if (formData.status) lines.push('Status: ' + formData.status);
+  if (formData.assignee) lines.push('Assignee: ' + formData.assignee);
+  if (formData.notes) { lines.push(''); lines.push('Note: ' + formData.notes); }
 
-    btn.disabled = false;
-    btn.textContent = 'Crea Task';
-    document.getElementById('notes').value = '';
-  });
+  var htmlBody = '<pre>' + lines.join('\n') + '</pre>';
+
+  // Open reply form with pre-filled content — user saves as draft
+  var item = Office.context.mailbox.item;
+  item.displayReplyForm(htmlBody);
+
+  showStatus(msg, 'success', 'Bozza aperta — salva senza inviare. Il sync la processerà.');
+  updateBadge('processing');
+  btn.disabled = false;
+  btn.textContent = 'Crea Task';
+  document.getElementById('notes').value = '';
 }
 
 function tryCategories(formData, callback) {
@@ -272,13 +280,20 @@ function submitFollowup(days) {
     notes: 'Follow-up su email da ' + emailContext.from
   };
 
-  tryCustomProperties(formData, function(propOk) {
-    if (propOk) {
-      showStatus(msg, 'success', 'Follow-up creato per ' + dueDateStr);
-    } else {
-      showStatus(msg, 'error', 'Errore nel salvare il follow-up.');
-    }
-  });
+  var lines = ['// TASK (from Outlook Add-in)', ''];
+  lines.push('Titolo: ' + formData.title);
+  lines.push('Priorita: ' + formData.priority);
+  lines.push('Scadenza: ' + formData.dueDate);
+  lines.push('Status: ' + formData.status);
+  lines.push('Assignee: ' + formData.assignee);
+  if (formData.notes) lines.push('Note: ' + formData.notes);
+
+  var htmlBody = '<pre>' + lines.join('\n') + '</pre>';
+
+  var item = Office.context.mailbox.item;
+  item.displayReplyForm(htmlBody);
+
+  showStatus(msg, 'success', 'Bozza follow-up aperta — salva senza inviare.');
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
