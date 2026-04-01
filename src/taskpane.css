@@ -1,0 +1,214 @@
+:root {
+  --brand: #0078d4;
+  --brand-hover: #106ebe;
+  --success: #107c10;
+  --warning: #ff8c00;
+  --danger: #d13438;
+  --bg: #ffffff;
+  --bg-secondary: #f3f2f1;
+  --text: #323130;
+  --text-secondary: #605e5c;
+  --border: #edebe9;
+  --radius: 4px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', -apple-system, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  padding: 12px;
+  line-height: 1.4;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.header h1 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.badge-none { background: var(--bg-secondary); color: var(--text-secondary); }
+.badge-linked { background: #dff6dd; color: var(--success); }
+.badge-processing { background: #fff4ce; color: var(--warning); }
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.tab:hover { color: var(--text); }
+.tab.active {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+}
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Form */
+.form-group {
+  margin-bottom: 10px;
+}
+.form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 3px;
+  color: var(--text-secondary);
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  transition: border-color 0.15s;
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+.form-group textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* Inline row */
+.form-row {
+  display: flex;
+  gap: 8px;
+}
+.form-row .form-group { flex: 1; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.15s;
+  width: 100%;
+}
+.btn-primary {
+  background: var(--brand);
+  color: white;
+}
+.btn-primary:hover { background: var(--brand-hover); }
+.btn-primary:disabled {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+}
+
+/* Status message */
+.status-msg {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  text-align: center;
+  display: none;
+}
+.status-msg.success { display: block; background: #dff6dd; color: var(--success); }
+.status-msg.error { display: block; background: #fde7e9; color: var(--danger); }
+.status-msg.loading { display: block; background: #fff4ce; color: var(--warning); }
+
+/* Related tasks */
+.task-list {
+  list-style: none;
+}
+.task-item {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.task-item .task-title {
+  font-size: 12px;
+  font-weight: 600;
+  flex: 1;
+}
+.task-item .task-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.priority-urgent { border-left: 3px solid var(--danger); }
+.priority-high { border-left: 3px solid var(--warning); }
+.priority-medium { border-left: 3px solid #0078d4; }
+.priority-low { border-left: 3px solid #107c10; }
+
+/* Quick follow-up */
+.followup-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.btn-followup {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-followup:hover {
+  background: var(--brand);
+  color: white;
+  border-color: var(--brand);
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Task Manager</title>
+  <link rel="stylesheet" href="taskpane.css"/>
+  <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Task Manager</h1>
+    <span id="badge" class="badge badge-none">Nessun task</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="create">Crea</button>
+    <button class="tab" data-tab="related">Correlati</button>
+    <button class="tab" data-tab="followup">Follow-up</button>
+  </div>
+
+  <!-- Tab: Crea Task -->
+  <div id="tab-create" class="tab-content active">
+    <form id="task-form">
+      <div class="form-group">
+        <label>Titolo</label>
+        <input type="text" id="title" placeholder="Generato da Claude se vuoto"/>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Area</label>
+          <select id="area">
+            <option value="">Auto (Claude)</option>
+            <option value="Deal Flow">Deal Flow</option>
+            <option value="CRM">CRM</option>
+            <option value="Portfolio">Portfolio</option>
+            <option value="Admin">Admin</option>
+            <option value="Ra.gg.io srl">Ra.gg.io srl</option>
+            <option value="Advisory">Advisory</option>
+            <option value="Personal">Personal</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Priorita</label>
+          <select id="priority">
+            <option value="">Auto (Claude)</option>
+            <option value="Urgent">Urgente</option>
+            <option value="High">Alta</option>
+            <option value="Medium">Media</option>
+            <option value="Low">Bassa</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Scadenza</label>
+          <input type="date" id="dueDate"/>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="status">
+            <option value="Not started">Not started</option>
+            <option value="In progress">In progress</option>
+            <option value="On Hold">On Hold</option>
+            <option value="Project">Project</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Assignee</label>
+        <select id="assignee">
+          <option value="Giuseppe">Giuseppe</option>
+          <option value="Renzo">Renzo</option>
+          <option value="Giovanni">Giovanni</option>
+          <option value="Alvaro">Alvaro</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Note / Istruzioni per Claude</label>
+        <textarea id="notes" rows="3" placeholder="Scrivi in linguaggio naturale... Claude interpretera il contesto dell'email + le tue note"></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="submitBtn">
+        Crea Task
+      </button>
+
+      <div id="statusMsg" class="status-msg"></div>
+    </form>
+  </div>
+
+  <!-- Tab: Task Correlati -->
+  <div id="tab-related" class="tab-content">
+    <ul id="relatedTasks" class="task-list">
+      <li class="empty-state">Caricamento...</li>
+    </ul>
+  </div>
+
+  <!-- Tab: Follow-up -->
+  <div id="tab-followup" class="tab-content">
+    <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
+      Crea un promemoria per seguire questa email:
+    </p>
+    <div class="followup-buttons">
+      <button class="btn-followup" data-days="1">Domani</button>
+      <button class="btn-followup" data-days="3">3 giorni</button>
+      <button class="btn-followup" data-days="7">1 settimana</button>
+      <button class="btn-followup" data-days="14">2 settimane</button>
+      <button class="btn-followup" data-days="30">1 mese</button>
+    </div>
+    <div id="followupMsg" class="status-msg"></div>
+  </div>
+
+  <script src="taskpane.js"></script>
+</body>
+</html>
